@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OmniSharp.LanguageServerProtocol;
+using OmniSharp.Plugins;
 using OmniSharp.Services;
 using OmniSharp.Stdio.Eventing;
 using OmniSharp.Stdio.Logging;
@@ -60,8 +63,10 @@ namespace OmniSharp.Stdio.Driver
                     var plugins = application.CreatePluginAssemblies();
 
                     var compositionHostBuilder = new CompositionHostBuilder(serviceProvider)
-                        .WithOmniSharpAssemblies()
-                        .WithAssemblies(assemblyLoader.LoadByAssemblyNameOrPath(plugins.AssemblyNames).ToArray());
+                        .WithOmniSharpAssemblies();
+
+                    var pluginAssemblies = LoadPluginAssemblies(loggerFactory, assemblyLoader, plugins);
+                    compositionHostBuilder.WithAssemblies(pluginAssemblies);
 
                     using (var host = new Host(input, writer, environment, serviceProvider, compositionHostBuilder, loggerFactory, cancellation))
                     {
@@ -75,5 +80,30 @@ namespace OmniSharp.Stdio.Driver
 
             return application.Execute(args);
         });
+
+        private static Assembly[] LoadPluginAssemblies(
+            ILoggerFactory loggerFactory,
+            IAssemblyLoader assemblyLoader,
+            PluginAssemblies plugins)
+        {
+            var logger = loggerFactory.CreateLogger<Program>();
+            var pluginAssemblies = new List<Assembly>();
+
+            foreach (var pluginAssemblyNameOrPath in plugins.AssemblyNames)
+            {
+                try
+                {
+                    var assembly = assemblyLoader.LoadByAssemblyNameOrPath(pluginAssemblyNameOrPath);
+                    pluginAssemblies.Add(assembly);
+                }
+                catch (Exception exception)
+                {
+                    logger.LogError($"Failed to load plugin assembly '{pluginAssemblyNameOrPath}'.");
+                    logger.LogError(exception.Message);
+                }
+            }
+
+            return pluginAssemblies.ToArray();
+        }
     }
 }
