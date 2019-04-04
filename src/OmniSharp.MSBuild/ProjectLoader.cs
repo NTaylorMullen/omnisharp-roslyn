@@ -83,7 +83,13 @@ namespace OmniSharp.MSBuild
                     msbuildLogger
                 };
 
-                if (_options.GenerateBinaryLogs)
+                var fileLogger = new MSB.Logging.FileLogger()
+                {
+                    Parameters = "verbosity=Diagnostic;logfile=" + Path.ChangeExtension(projectInstance.FullPath, ".log"),
+                };
+                loggers.Add(fileLogger);
+
+                if (_options.GenerateBinaryLogs || true)
                 {
                     var binlogPath = Path.ChangeExtension(projectInstance.FullPath, ".binlog");
                     var binaryLogger = new MSB.Logging.BinaryLogger()
@@ -131,6 +137,11 @@ namespace OmniSharp.MSBuild
             var project = projectCollection.LoadProject(filePath, toolsVersion);
 
             SetTargetFrameworkIfNeeded(project);
+
+            using (var writer = new StreamWriter(Path.ChangeExtension(project.FullPath, ".preprocessed")))
+            {
+                project.SaveLogicalProject(writer);
+            }
 
             return project;
         }
